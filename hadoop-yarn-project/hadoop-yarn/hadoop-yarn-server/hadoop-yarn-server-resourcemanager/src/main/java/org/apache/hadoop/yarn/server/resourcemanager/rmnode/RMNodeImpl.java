@@ -458,8 +458,13 @@ public class RMNodeImpl implements RMNode, EventHandler<RMNodeEvent> {
     @Override
     public void transition(RMNodeImpl rmNode, RMNodeEvent event) {
       // Inform the scheduler
-      rmNode.context.getDispatcher().getEventHandler().handle(
-          new NodeRemovedSchedulerEvent(rmNode));
+      // If the current state is NodeState.UNHEALTHY
+      // Then node is already been removed from the
+      // Scheduler
+      if (!rmNode.getState().equals(NodeState.UNHEALTHY)) {
+        rmNode.context.getDispatcher().getEventHandler()
+          .handle(new NodeRemovedSchedulerEvent(rmNode));
+      }
       rmNode.context.getDispatcher().getEventHandler().handle(
           new NodesListManagerEvent(
               NodesListManagerEventType.NODE_UNUSABLE, rmNode));

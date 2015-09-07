@@ -22,6 +22,7 @@ import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.times;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -44,6 +45,7 @@ import org.apache.hadoop.yarn.server.resourcemanager.rmnode.RMNodeImpl;
 import org.apache.hadoop.yarn.server.resourcemanager.rmnode.RMNodeStatusEvent;
 import org.apache.hadoop.yarn.server.resourcemanager.scheduler.YarnScheduler;
 import org.apache.hadoop.yarn.server.resourcemanager.scheduler.event.NodeAddedSchedulerEvent;
+import org.apache.hadoop.yarn.server.resourcemanager.scheduler.event.NodeRemovedSchedulerEvent;
 import org.apache.hadoop.yarn.server.resourcemanager.scheduler.event.NodeUpdateSchedulerEvent;
 import org.apache.hadoop.yarn.server.resourcemanager.scheduler.event.SchedulerEvent;
 import org.apache.hadoop.yarn.server.resourcemanager.scheduler.event.SchedulerEventType;
@@ -160,6 +162,15 @@ public class TestRMNodeTransitions {
   public void testUnhealthyExpire() {
     RMNodeImpl node = getUnhealthyNode();
     node.handle(new RMNodeEvent(node.getNodeID(), RMNodeEventType.EXPIRE));
+    Assert.assertEquals(NodeState.LOST, node.getState());
+  }
+
+  @Test
+  public void testUnhealthyExpireForSchedulerRemove() {
+    RMNodeImpl node = getUnhealthyNode();
+    verify(scheduler, times(2)).handle(any(NodeRemovedSchedulerEvent.class));
+    node.handle(new RMNodeEvent(node.getNodeID(), RMNodeEventType.EXPIRE));
+    verify(scheduler, times(2)).handle(any(NodeRemovedSchedulerEvent.class));
     Assert.assertEquals(NodeState.LOST, node.getState());
   }
 

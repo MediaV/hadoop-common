@@ -1,0 +1,48 @@
+diff --git hadoop-yarn-project/hadoop-yarn/hadoop-yarn-server/hadoop-yarn-server-resourcemanager/src/main/java/org/apache/hadoop/yarn/server/resourcemanager/rmnode/RMNodeImpl.java hadoop-yarn-project/hadoop-yarn/hadoop-yarn-server/hadoop-yarn-server-resourcemanager/src/main/java/org/apache/hadoop/yarn/server/resourcemanager/rmnode/RMNodeImpl.java
+index 70507f6..3fc6bf8 100644
+--- hadoop-yarn-project/hadoop-yarn/hadoop-yarn-server/hadoop-yarn-server-resourcemanager/src/main/java/org/apache/hadoop/yarn/server/resourcemanager/rmnode/RMNodeImpl.java
++++ hadoop-yarn-project/hadoop-yarn/hadoop-yarn-server/hadoop-yarn-server-resourcemanager/src/main/java/org/apache/hadoop/yarn/server/resourcemanager/rmnode/RMNodeImpl.java
+@@ -501,8 +501,13 @@ public DeactivateNodeTransition(NodeState finalState) {
+     public void transition(RMNodeImpl rmNode, RMNodeEvent event) {
+       // Inform the scheduler
+       rmNode.nodeUpdateQueue.clear();
+-      rmNode.context.getDispatcher().getEventHandler().handle(
+-          new NodeRemovedSchedulerEvent(rmNode));
++      // If the current state is NodeState.UNHEALTHY
++      // Then node is already been removed from the
++      // Scheduler
++      if (!rmNode.getState().equals(NodeState.UNHEALTHY)) {
++        rmNode.context.getDispatcher().getEventHandler()
++          .handle(new NodeRemovedSchedulerEvent(rmNode));
++      }
+       rmNode.context.getDispatcher().getEventHandler().handle(
+           new NodesListManagerEvent(
+               NodesListManagerEventType.NODE_UNUSABLE, rmNode));
+diff --git hadoop-yarn-project/hadoop-yarn/hadoop-yarn-server/hadoop-yarn-server-resourcemanager/src/test/java/org/apache/hadoop/yarn/server/resourcemanager/TestRMNodeTransitions.java hadoop-yarn-project/hadoop-yarn/hadoop-yarn-server/hadoop-yarn-server-resourcemanager/src/test/java/org/apache/hadoop/yarn/server/resourcemanager/TestRMNodeTransitions.java
+index fbec326..1def244 100644
+--- hadoop-yarn-project/hadoop-yarn/hadoop-yarn-server/hadoop-yarn-server-resourcemanager/src/test/java/org/apache/hadoop/yarn/server/resourcemanager/TestRMNodeTransitions.java
++++ hadoop-yarn-project/hadoop-yarn/hadoop-yarn-server/hadoop-yarn-server-resourcemanager/src/test/java/org/apache/hadoop/yarn/server/resourcemanager/TestRMNodeTransitions.java
+@@ -48,6 +48,7 @@
+ import org.apache.hadoop.yarn.server.resourcemanager.rmnode.UpdatedContainerInfo;
+ import org.apache.hadoop.yarn.server.resourcemanager.scheduler.YarnScheduler;
+ import org.apache.hadoop.yarn.server.resourcemanager.scheduler.event.NodeAddedSchedulerEvent;
++import org.apache.hadoop.yarn.server.resourcemanager.scheduler.event.NodeRemovedSchedulerEvent;
+ import org.apache.hadoop.yarn.server.resourcemanager.scheduler.event.NodeUpdateSchedulerEvent;
+ import org.apache.hadoop.yarn.server.resourcemanager.scheduler.event.SchedulerEvent;
+ import org.apache.hadoop.yarn.server.resourcemanager.scheduler.event.SchedulerEventType;
+@@ -269,6 +270,15 @@ public void testUnhealthyExpire() {
+     node.handle(new RMNodeEvent(node.getNodeID(), RMNodeEventType.EXPIRE));
+     Assert.assertEquals(NodeState.LOST, node.getState());
+   }
++  
++  @Test
++  public void testUnhealthyExpireForSchedulerRemove() {
++    RMNodeImpl node = getUnhealthyNode();
++    verify(scheduler,times(2)).handle(any(NodeRemovedSchedulerEvent.class));
++    node.handle(new RMNodeEvent(node.getNodeID(), RMNodeEventType.EXPIRE));
++    verify(scheduler,times(2)).handle(any(NodeRemovedSchedulerEvent.class));
++    Assert.assertEquals(NodeState.LOST, node.getState());
++  }
+ 
+   @Test
+   public void testRunningDecommission() {
